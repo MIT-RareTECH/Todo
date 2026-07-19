@@ -10,18 +10,34 @@ const colors = {
   muted: "#8a8a86",
 };
 
-export default function TodoAuth() {
-  const [mode, setMode] = useState("login"); // "login" | "register"
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
+export default function TodoMain({ userName = "MITSUKI", onLogout }) {
+  const [tasks, setTasks] = useState([]);
+  const [input, setInput] = useState("");
 
-  const canSubmit = name.trim().length > 0 && password.length >= 4;
-  const submitLabel = mode === "login" ? "ログイン" : "新規登録";
+  const remaining = tasks.filter((t) => !t.done).length;
+  const canAdd = input.trim().length > 0;
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    // ここに認証処理を実装
-    console.log({ mode, name, password });
+  const addTask = () => {
+    if (!canAdd) return;
+    setTasks([...tasks, { id: Date.now(), text: input.trim(), done: false }]);
+    setInput("");
+  };
+
+  const toggleTask = (id) =>
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+
+  const deleteTask = (id) => setTasks(tasks.filter((t) => t.id !== id));
+
+  const inputStyle = {
+    flex: 1,
+    boxSizing: "border-box",
+    padding: "14px 16px",
+    fontSize: 14,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 6,
+    background: "#fdfcfa",
+    outline: "none",
+    fontFamily: "inherit",
   };
 
   return (
@@ -29,200 +45,230 @@ export default function TodoAuth() {
       style={{
         minHeight: "100vh",
         background: colors.bg,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "48px 16px",
+        padding: "32px 16px",
         fontFamily:
           '"Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
         color: colors.text,
+        boxSizing: "border-box",
       }}
     >
-      {/* ロゴ */}
-      <div
-        style={{
-          width: 64,
-          height: 64,
-          border: `1px solid ${colors.gold}`,
-          borderRadius: 8,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: colors.card,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: 28,
-            color: colors.gold,
-          }}
-        >
-          T
-        </span>
-      </div>
-
-      {/* タイトル */}
-      <h1
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontSize: 44,
-          fontWeight: 400,
-          margin: "24px 0 8px",
-          letterSpacing: "0.02em",
-        }}
-      >
-        Todo
-      </h1>
-      <p style={{ margin: 0, fontSize: 14, color: colors.muted }}>
-        ログインして始めましょう
-      </p>
-
-      {/* カード */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 500,
-          marginTop: 40,
-          padding: 24,
-          background: colors.card,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 6,
-          boxSizing: "border-box",
-        }}
-      >
-        {/* タブ切り替え */}
-        <div
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        {/* ヘッダー */}
+        <header
           style={{
             display: "flex",
-            border: `1px solid ${colors.border}`,
-            borderRadius: 6,
-            overflow: "hidden",
-            marginBottom: 24,
+            alignItems: "center",
+            gap: 16,
+            paddingBottom: 24,
+            borderBottom: `1px solid ${colors.border}`,
           }}
         >
-          {[
-            { key: "login", label: "ログイン" },
-            { key: "register", label: "新規登録" },
-          ].map((tab) => {
-            const active = mode === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setMode(tab.key)}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  fontSize: 14,
-                  cursor: "pointer",
-                  background: active ? "#fdfcfa" : "transparent",
-                  color: active ? colors.gold : colors.text,
-                  border: "none",
-                  boxShadow: active
-                    ? `inset 0 0 0 1.5px ${colors.gold}`
-                    : "none",
-                  borderRadius: active ? 5 : 0,
-                  fontFamily: "inherit",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+          {/* イニシャルロゴ */}
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              border: `1px solid ${colors.gold}`,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: colors.card,
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: 22,
+                color: colors.gold,
+              }}
+            >
+              {userName.charAt(0).toUpperCase()}
+            </span>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: 20,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {userName}
+            </div>
+            <div style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>
+              さんのTodo
+            </div>
+          </div>
+
+          <button
+            onClick={onLogout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "12px 18px",
+              fontSize: 14,
+              background: "#fdfcfa",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 6,
+              cursor: "pointer",
+              color: colors.text,
+              fontFamily: "inherit",
+            }}
+          >
+            <span aria-hidden="true">[→</span>
+            ログアウト
+          </button>
+        </header>
+
+        {/* タスク入力 */}
+        <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addTask()}
+            placeholder="新しいタスクを入力..."
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = colors.gold)}
+            onBlur={(e) => (e.target.style.borderColor = colors.border)}
+          />
+          <button
+            onClick={addTask}
+            disabled={!canAdd}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "0 22px",
+              fontSize: 14,
+              border: `1px solid ${canAdd ? colors.gold : colors.border}`,
+              borderRadius: 6,
+              background: canAdd ? colors.gold : "transparent",
+              color: canAdd ? "#fff" : colors.goldSoft,
+              cursor: canAdd ? "pointer" : "default",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>+</span>
+            追加
+          </button>
         </div>
 
-        {/* お名前 */}
-        <label
+        {/* 残り件数 */}
+        <div
           style={{
-            display: "block",
-            fontSize: 12,
-            marginBottom: 8,
-            color: colors.text,
+            textAlign: "right",
+            fontSize: 13,
+            color: colors.muted,
+            margin: "16px 0",
           }}
         >
-          お名前
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="例:田中 太郎"
+          残り <span style={{ color: colors.gold }}>{remaining}</span> 件
+        </div>
+
+        {/* タスクリスト / 空状態 */}
+        <div
           style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "14px 16px",
-            fontSize: 14,
+            background: colors.card,
             border: `1px solid ${colors.border}`,
             borderRadius: 6,
-            background: "#fdfcfa",
-            outline: "none",
-            marginBottom: 20,
-            fontFamily: "inherit",
+            minHeight: 160,
           }}
-          onFocus={(e) => (e.target.style.borderColor = colors.gold)}
-          onBlur={(e) => (e.target.style.borderColor = colors.border)}
-        />
+        >
+          {tasks.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "56px 24px" }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                タスクはまだありません
+              </div>
+              <div
+                style={{ fontSize: 13, color: colors.muted, marginTop: 12 }}
+              >
+                上の入力欄から追加しましょう
+              </div>
+            </div>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 8 }}>
+              {tasks.map((task) => (
+                <li
+                  key={task.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 12px",
+                    borderBottom: `1px solid ${colors.border}`,
+                  }}
+                >
+                  <button
+                    onClick={() => toggleTask(task.id)}
+                    aria-label={task.done ? "未完了に戻す" : "完了にする"}
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      border: `1.5px solid ${
+                        task.done ? colors.gold : colors.border
+                      }`,
+                      background: task.done ? colors.gold : "transparent",
+                      color: "#fff",
+                      fontSize: 12,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {task.done ? "✓" : ""}
+                  </button>
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: 14,
+                      color: task.done ? colors.muted : colors.text,
+                      textDecoration: task.done ? "line-through" : "none",
+                    }}
+                  >
+                    {task.text}
+                  </span>
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    aria-label="削除"
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: colors.muted,
+                      fontSize: 16,
+                      cursor: "pointer",
+                      padding: 4,
+                    }}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        {/* パスワード */}
-        <label
+        {/* フッター */}
+        <footer
           style={{
-            display: "block",
+            marginTop: 40,
+            paddingTop: 24,
+            borderTop: `1px solid ${colors.border}`,
+            textAlign: "center",
             fontSize: 12,
-            marginBottom: 8,
-            color: colors.text,
+            color: colors.muted,
           }}
         >
-          パスワード
-        </label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="4文字以上"
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "14px 16px",
-            fontSize: 14,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 6,
-            background: "#fdfcfa",
-            outline: "none",
-            marginBottom: 24,
-            fontFamily: "inherit",
-          }}
-          onFocus={(e) => (e.target.style.borderColor = colors.gold)}
-          onBlur={(e) => (e.target.style.borderColor = colors.border)}
-        />
-
-        {/* 送信ボタン */}
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          style={{
-            width: "100%",
-            padding: "14px 0",
-            fontSize: 14,
-            borderRadius: 6,
-            border: `1px solid ${canSubmit ? colors.gold : colors.border}`,
-            background: canSubmit ? colors.gold : "transparent",
-            color: canSubmit ? "#fff" : colors.goldSoft,
-            cursor: canSubmit ? "pointer" : "default",
-            transition: "all 0.15s ease",
-            fontFamily: "inherit",
-          }}
-        >
-          {submitLabel}
-        </button>
+          保存先:AWS RDS(このプロトタイプではブラウザに保存)
+        </footer>
       </div>
-
-      {/* フッター */}
-      <p style={{ marginTop: 28, fontSize: 12, color: colors.muted }}>
-        アカウントごとにTodoが保存されます
-      </p>
     </div>
   );
 }
-
