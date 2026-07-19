@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { signOut, fetchUserAttributes } from "aws-amplify/auth";
+import { generateClient } from "aws-amplify/data";
+
+const client = generateClient();
 
 const colors = {
   bg: "#f1f0ee",
@@ -10,34 +14,50 @@ const colors = {
   muted: "#8a8a86",
 };
 
-export default function TodoMain({ userName = "MITSUKI", onLogout }) {
+export default function TodoMain({ onLogout = () => {} }) {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState("");
+  const [userName, setUserName] = useState("");
+
+  // ログイン中ユーザーの名前を取得
+  useEffect(() => {
+    fetchUserAttributes()
+      .then((attrs) => setUserName(attrs.name || attrs.email || ""))
+      .catch(() => setUserName(""));
+  }, []);
+
+  // Todoをリアルタイム購読(追加・変更が自動反映される)
+  useEffect(() => {
+    const sub = client.models.Todo.observeQuery().subscribe({
+      next: ({ items }) =>
+        setTasks(
+          [...items].sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+          )
+        ),
+      error: (e) => console.error("observeQuery error:", e),
+    });
+    return () => sub.unsubscribe();
+  }, []);
 
   const remaining = tasks.filter((t) => !t.done).length;
   const canAdd = input.trim().length > 0;
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!canAdd) return;
-    setTasks([...tasks, { id: Date.now(), text: input.trim(), done: false }]);
+    const content = input.trim();
     setInput("");
+    await client.models.Todo.create({ content, done: false });
   };
 
-  const toggleTask = (id) =>
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const toggleTask = (task) =>
+    client.models.Todo.update({ id: task.id, done: !task.done });
 
-  const deleteTask = (id) => setTasks(tasks.filter((t) => t.id !== id));
+  const deleteTask = (id) => client.models.Todo.delete({ id });
 
-  const inputStyle = {
-    flex: 1,
-    boxSizing: "border-box",
-    padding: "14px 16px",
-    fontSize: 14,
-    border: `1px solid ${colors.border}`,
-    borderRadius: 6,
-    background: "#fdfcfa",
-    outline: "none",
-    fontFamily: "inherit",
+  const handleLogout = async () => {
+    await signOut();
+    onLogout();
   };
 
   return (
@@ -63,7 +83,6 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
             borderBottom: `1px solid ${colors.border}`,
           }}
         >
-          {/* イニシャルロゴ */}
           <div
             style={{
               width: 52,
@@ -84,7 +103,7 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
                 color: colors.gold,
               }}
             >
-              {userName.charAt(0).toUpperCase()}
+              {(userName || "?").charAt(0).toUpperCase()}
             </span>
           </div>
 
@@ -94,6 +113,9 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
                 fontFamily: 'Georgia, "Times New Roman", serif',
                 fontSize: 20,
                 letterSpacing: "0.04em",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
               {userName}
@@ -104,7 +126,7 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
           </div>
 
           <button
-            onClick={onLogout}
+            onClick={handleLogout}
             style={{
               display: "flex",
               alignItems: "center",
@@ -132,7 +154,17 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
             placeholder="新しいタスクを入力..."
-            style={inputStyle}
+            style={{
+              flex: 1,
+              boxSizing: "border-box",
+              padding: "14px 16px",
+              fontSize: 14,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 6,
+              background: "#fdfcfa",
+              outline: "none",
+              fontFamily: "inherit",
+            }}
             onFocus={(e) => (e.target.style.borderColor = colors.gold)}
             onBlur={(e) => (e.target.style.borderColor = colors.border)}
           />
@@ -206,7 +238,7 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
                   }}
                 >
                   <button
-                    onClick={() => toggleTask(task.id)}
+                    onClick={() => toggleTask(task)}
                     aria-label={task.done ? "未完了に戻す" : "完了にする"}
                     style={{
                       width: 20,
@@ -231,9 +263,10 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
                       fontSize: 14,
                       color: task.done ? colors.muted : colors.text,
                       textDecoration: task.done ? "line-through" : "none",
+                      wordBreak: "break-word",
                     }}
                   >
-                    {task.text}
+                    {task.content}
                   </span>
                   <button
                     onClick={() => deleteTask(task.id)}
@@ -266,7 +299,7 @@ export default function TodoMain({ userName = "MITSUKI", onLogout }) {
             color: colors.muted,
           }}
         >
-          保存先:AWS RDS(このプロトタイプではブラウザに保存)
+          保存先:AWS(Amplify / DynamoDB)
         </footer>
       </div>
     </div>

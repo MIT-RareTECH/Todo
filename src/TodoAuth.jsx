@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { signIn, signUp, confirmSignUp } from "aws-amplify/auth";
 
 const colors = {
   bg: "#f1f0ee",
@@ -8,21 +9,96 @@ const colors = {
   goldSoft: "#c9a05e",
   text: "#1a1a1a",
   muted: "#8a8a86",
+  error: "#b0413e",
 };
 
-export default function TodoAuth() {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "14px 16px",
+  fontSize: 14,
+  border: `1px solid ${colors.border}`,
+  borderRadius: 6,
+  background: "#fdfcfa",
+  outline: "none",
+  marginBottom: 20,
+  fontFamily: "inherit",
+};
+
+const labelStyle = {
+  display: "block",
+  fontSize: 12,
+  marginBottom: 8,
+  color: colors.text,
+};
+
+export default function TodoAuth({ onLogin = () => {} }) {
+  const [mode, setMode] = useState("login"); // "login" | "register" | "confirm"
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const canSubmit = name.trim().length > 0 && password.length >= 4;
-  const submitLabel = mode === "login" ? "ログイン" : "新規登録";
+  const canSubmit =
+    mode === "confirm"
+      ? code.trim().length > 0
+      : email.trim().length > 0 &&
+        password.length >= 8 &&
+        (mode === "login" || name.trim().length > 0);
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    // ここに認証処理を実装
-    console.log({ mode, name, password });
+  const submitLabel =
+    mode === "login" ? "ログイン" : mode === "register" ? "新規登録" : "確認";
+
+  const handleSubmit = async () => {
+    if (!canSubmit || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await signIn({ username: email.trim(), password });
+        onLogin();
+      } else if (mode === "register") {
+        await signUp({
+          username: email.trim(),
+          password,
+          options: {
+            userAttributes: {
+              email: email.trim(),
+              name: name.trim(),
+            },
+          },
+        });
+        setMode("confirm"); // メールに届いた確認コードの入力へ
+      } else if (mode === "confirm") {
+        await confirmSignUp({
+          username: email.trim(),
+          confirmationCode: code.trim(),
+        });
+        await signIn({ username: email.trim(), password });
+        onLogin();
+      }
+    } catch (e) {
+      const messages = {
+        UserNotFoundException: "このメールアドレスは登録されていません",
+        NotAuthorizedException: "メールアドレスまたはパスワードが違います",
+        UsernameExistsException: "このメールアドレスは既に登録されています",
+        CodeMismatchException: "確認コードが正しくありません",
+        InvalidPasswordException:
+          "パスワードの要件を満たしていません(8文字以上)",
+        UserNotConfirmedException: "メールの確認が完了していません",
+      };
+      if (e.name === "UserNotConfirmedException") setMode("confirm");
+      setError(messages[e.name] || e.message || "エラーが発生しました");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const focusGold = (e) => (e.target.style.borderColor = colors.gold);
+  const blurGray = (e) => (e.target.style.borderColor = colors.border);
+  const onEnter = (e) => e.key === "Enter" && handleSubmit();
 
   return (
     <div
@@ -37,6 +113,7 @@ export default function TodoAuth() {
         fontFamily:
           '"Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif',
         color: colors.text,
+        boxSizing: "border-box",
       }}
     >
       {/* ロゴ */}
@@ -63,7 +140,6 @@ export default function TodoAuth() {
         </span>
       </div>
 
-      {/* タイトル */}
       <h1
         style={{
           fontFamily: 'Georgia, "Times New Roman", serif',
@@ -76,10 +152,11 @@ export default function TodoAuth() {
         Todo
       </h1>
       <p style={{ margin: 0, fontSize: 14, color: colors.muted }}>
-        ログインして始めましょう
+        {mode === "confirm"
+          ? "メールに届いた確認コードを入力してください"
+          : "ログインして始めましょう"}
       </p>
 
-      {/* カード */}
       <div
         style={{
           width: "100%",
@@ -92,133 +169,141 @@ export default function TodoAuth() {
           boxSizing: "border-box",
         }}
       >
-        {/* タブ切り替え */}
-        <div
-          style={{
-            display: "flex",
-            border: `1px solid ${colors.border}`,
-            borderRadius: 6,
-            overflow: "hidden",
-            marginBottom: 24,
-          }}
-        >
-          {[
-            { key: "login", label: "ログイン" },
-            { key: "register", label: "新規登録" },
-          ].map((tab) => {
-            const active = mode === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setMode(tab.key)}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  fontSize: 14,
-                  cursor: "pointer",
-                  background: active ? "#fdfcfa" : "transparent",
-                  color: active ? colors.gold : colors.text,
-                  border: "none",
-                  boxShadow: active
-                    ? `inset 0 0 0 1.5px ${colors.gold}`
-                    : "none",
-                  borderRadius: active ? 5 : 0,
-                  fontFamily: "inherit",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        {mode !== "confirm" && (
+          <div
+            style={{
+              display: "flex",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 6,
+              overflow: "hidden",
+              marginBottom: 24,
+            }}
+          >
+            {[
+              { key: "login", label: "ログイン" },
+              { key: "register", label: "新規登録" },
+            ].map((tab) => {
+              const active = mode === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setMode(tab.key);
+                    setError("");
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "12px 0",
+                    fontSize: 14,
+                    cursor: "pointer",
+                    background: active ? "#fdfcfa" : "transparent",
+                    color: active ? colors.gold : colors.text,
+                    border: "none",
+                    boxShadow: active
+                      ? `inset 0 0 0 1.5px ${colors.gold}`
+                      : "none",
+                    borderRadius: active ? 5 : 0,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        {/* お名前 */}
-        <label
-          style={{
-            display: "block",
-            fontSize: 12,
-            marginBottom: 8,
-            color: colors.text,
-          }}
-        >
-          お名前
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="例:田中 太郎"
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "14px 16px",
-            fontSize: 14,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 6,
-            background: "#fdfcfa",
-            outline: "none",
-            marginBottom: 20,
-            fontFamily: "inherit",
-          }}
-          onFocus={(e) => (e.target.style.borderColor = colors.gold)}
-          onBlur={(e) => (e.target.style.borderColor = colors.border)}
-        />
+        {mode === "register" && (
+          <>
+            <label style={labelStyle}>お名前</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例:田中 太郎"
+              style={inputStyle}
+              onFocus={focusGold}
+              onBlur={blurGray}
+            />
+          </>
+        )}
 
-        {/* パスワード */}
-        <label
-          style={{
-            display: "block",
-            fontSize: 12,
-            marginBottom: 8,
-            color: colors.text,
-          }}
-        >
-          パスワード
-        </label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="4文字以上"
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "14px 16px",
-            fontSize: 14,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 6,
-            background: "#fdfcfa",
-            outline: "none",
-            marginBottom: 24,
-            fontFamily: "inherit",
-          }}
-          onFocus={(e) => (e.target.style.borderColor = colors.gold)}
-          onBlur={(e) => (e.target.style.borderColor = colors.border)}
-        />
+        {mode !== "confirm" ? (
+          <>
+            <label style={labelStyle}>メールアドレス</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="例:mitsuki@example.com"
+              style={inputStyle}
+              onFocus={focusGold}
+              onBlur={blurGray}
+            />
 
-        {/* 送信ボタン */}
+            <label style={labelStyle}>パスワード</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="8文字以上"
+              onKeyDown={onEnter}
+              style={inputStyle}
+              onFocus={focusGold}
+              onBlur={blurGray}
+            />
+          </>
+        ) : (
+          <>
+            <label style={labelStyle}>確認コード</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="例:123456"
+              onKeyDown={onEnter}
+              style={inputStyle}
+              onFocus={focusGold}
+              onBlur={blurGray}
+            />
+          </>
+        )}
+
+        {error && (
+          <p
+            style={{
+              margin: "0 0 16px",
+              fontSize: 13,
+              color: colors.error,
+            }}
+          >
+            {error}
+          </p>
+        )}
+
         <button
           onClick={handleSubmit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || loading}
           style={{
             width: "100%",
             padding: "14px 0",
             fontSize: 14,
             borderRadius: 6,
-            border: `1px solid ${canSubmit ? colors.gold : colors.border}`,
-            background: canSubmit ? colors.gold : "transparent",
-            color: canSubmit ? "#fff" : colors.goldSoft,
-            cursor: canSubmit ? "pointer" : "default",
+            border: `1px solid ${
+              canSubmit && !loading ? colors.gold : colors.border
+            }`,
+            background: canSubmit && !loading ? colors.gold : "transparent",
+            color: canSubmit && !loading ? "#fff" : colors.goldSoft,
+            cursor: canSubmit && !loading ? "pointer" : "default",
             transition: "all 0.15s ease",
             fontFamily: "inherit",
           }}
         >
-          {submitLabel}
+          {loading ? "処理中..." : submitLabel}
         </button>
       </div>
 
-      {/* フッター */}
       <p style={{ marginTop: 28, fontSize: 12, color: colors.muted }}>
         アカウントごとにTodoが保存されます
       </p>
